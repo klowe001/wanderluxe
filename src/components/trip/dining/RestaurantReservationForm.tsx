@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -24,6 +25,7 @@ const formSchema = z.object({
   currency: z.string().optional().nullable(),
   place_id: z.string().optional(),
   rating: z.number().optional(),
+  trip_id: z.string().optional(), // Added trip_id to schema
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -32,7 +34,7 @@ interface RestaurantReservationFormProps {
   onSubmit: (data: FormValues & { trip_id: string }) => void; 
   defaultValues?: Partial<FormValues> & { trip_id?: string };
   isSubmitting?: boolean;
-  tripId: string; 
+  tripId: string; // Make tripId required
 }
 
 const RestaurantReservationForm: React.FC<RestaurantReservationFormProps> = ({
@@ -42,8 +44,8 @@ const RestaurantReservationForm: React.FC<RestaurantReservationFormProps> = ({
   tripId,
 }) => {
   console.log("RestaurantReservationForm received tripId:", tripId);
-  const [setIsGoogleMapsLoaded] = useState(false);
-  const toast = useToast();
+  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
+  const { toast } = useToast();
 
   // Load Google Maps API.
   useEffect(() => {
@@ -53,11 +55,19 @@ const RestaurantReservationForm: React.FC<RestaurantReservationFormProps> = ({
         if (loaded) {
           setIsGoogleMapsLoaded(true);
         } else {
-          toast('Failed to initialize restaurant search', { variant: 'error' });
+          toast({
+            title: 'Error',
+            description: 'Failed to initialize restaurant search',
+            variant: 'destructive',
+          });
         }
       } catch (error) {
         console.error('Error initializing Google Places:', error);
-        toast('Failed to initialize restaurant search', { variant: 'error' });
+        toast({
+          title: 'Error',
+          description: 'Failed to initialize restaurant search',
+          variant: 'destructive',
+        });
       }
     };
     loadAPI();
@@ -72,22 +82,27 @@ const RestaurantReservationForm: React.FC<RestaurantReservationFormProps> = ({
       notes: '',
       cost: undefined,
       currency: null,
+      trip_id: tripId, // Initialize with the tripId prop
       ...defaultValues,
     },
   });
 
-  const handleSubmitForm = form.handleSubmit((data) => {
-    // Use the tripId prop or a default from editing values if available.
-    const effectiveTripId = tripId || defaultValues?.trip_id;
-    if (!effectiveTripId) {
-      console.error('Trip ID is required');
-      return;
+  // Ensure trip_id is always set in the form
+  useEffect(() => {
+    if (tripId) {
+      form.setValue('trip_id', tripId);
     }
+  }, [tripId, form]);
+
+  const handleSubmitForm = form.handleSubmit((data) => {
+    // Always include the tripId in the submitted data
     const processedData = {
       ...data,
       reservation_time: data.reservation_time === '' ? null : data.reservation_time,
-      trip_id: effectiveTripId
+      trip_id: tripId
     };
+    
+    console.log('Submitting reservation with data:', processedData);
     onSubmit(processedData);
   });
 
@@ -131,6 +146,9 @@ const RestaurantReservationForm: React.FC<RestaurantReservationFormProps> = ({
             </FormItem>
           )}
         />
+
+        {/* Hidden Trip ID field - This ensures the trip_id is included in the form submission */}
+        <input type="hidden" {...form.register('trip_id')} value={tripId} />
 
         {/* Reservation Time */}
         <FormField

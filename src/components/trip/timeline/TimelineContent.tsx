@@ -54,6 +54,7 @@ const TimelineContent: React.FC<TimelineContentProps> = ({
               
               return dayDate >= checkinDate && dayDate < checkoutDate;
             })}
+            transportations={[]} // Add empty transportations array if needed
           />
         );
       })}

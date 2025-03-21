@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import DayHeader from './DayHeader';
@@ -11,6 +12,7 @@ import DayImage from './DayImage';
 import DayCardContent from './DayCardContent';
 import DayEditDialog from './DayEditDialog';
 import { toast } from 'sonner';
+import RestaurantReservationDialog from '../dining/RestaurantReservationDialog';
 
 interface DayCardProps {
   id: string;
@@ -46,6 +48,7 @@ const DayCard: React.FC<DayCardProps> = ({
   const [editTitle, setEditTitle] = useState(title);
   // Initialize with originalImageUrl if available, then fallback to imageUrl, then null
   const [imageUrlState, setImageUrl] = useState(originalImageUrl || imageUrl || null);
+  const [isReservationDialogOpen, setIsReservationDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   
   // Update imageUrlState when originalImageUrl changes (from parent component)
@@ -69,6 +72,34 @@ const DayCard: React.FC<DayCardProps> = ({
     },
     enabled: !!id,
   });
+
+  const handleReservationSubmit = async (data) => {
+    try {
+      // Make sure trip_id is included in the data
+      const reservationData = {
+        ...data,
+        day_id: id,
+        trip_id: tripId,
+        order_index: reservations?.length || 0
+      };
+
+      const { error } = await supabase
+        .from('restaurant_reservations')
+        .insert([reservationData]);
+
+      if (error) {
+        console.error('Error saving reservation:', error);
+        toast.error('Failed to add reservation');
+        throw error;
+      }
+
+      toast.success('Reservation added successfully');
+      queryClient.invalidateQueries(['reservations', id]);
+      setIsReservationDialogOpen(false);
+    } catch (error) {
+      console.error('Error in handleReservationSubmit:', error);
+    }
+  };
 
   const dayTitle = title || format(parseISO(date), 'EEEE');
 
@@ -142,6 +173,15 @@ const DayCard: React.FC<DayCardProps> = ({
         currentTitle={title}
         onTitleChange={setEditTitle}
         onSave={handleSaveEdit}
+      />
+
+      <RestaurantReservationDialog
+        isOpen={isReservationDialogOpen}
+        onOpenChange={setIsReservationDialogOpen}
+        onSubmit={handleReservationSubmit}
+        isSubmitting={false}
+        title="Add Restaurant Reservation"
+        tripId={tripId} // Pass the tripId explicitly
       />
 
       {/* Header stays at top, outside of collapsible */}
@@ -311,7 +351,7 @@ const DayCard: React.FC<DayCardProps> = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {}}
+                      onClick={() => setIsReservationDialogOpen(true)}
                       className="w-full bg-white/10 text-white hover:bg-white/20 mt-2"
                     >
                       <Plus className="h-4 w-4 mr-2" />
